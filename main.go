@@ -39,10 +39,12 @@ func restTest() {
 
 	availuri := fmt.Sprintf("Accounts/%s/AvailablePhoneNumbers/%s/Local.json", url.QueryEscape(*accountsid), url.QueryEscape(*country))
 
-	url := fmt.Sprintf("%s/%s/%s", apibase, apiversion, availuri)
-
-	fmt.Println(url)
-	req, err := http.NewRequest("GET", url, nil)
+	u, err := url.Parse(fmt.Sprintf("%s/%s/%s", apibase, apiversion, availuri))
+	q := u.Query()
+	q.Set("Contains", "+441702")
+	u.RawQuery = q.Encode()
+	fmt.Println(u)
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		log.Fatalf("error building request: %s", err)
 	}
