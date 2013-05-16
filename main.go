@@ -18,8 +18,16 @@ import (
 var (
 	accountsid = flag.String("accountsid", "", "The account sid to use")
 	authtoken  = flag.String("authtoken", "", "The auth token to use")
-	country    = flag.String("country", "", "The ISO3166 Country Code (GB, US, CA etc)")
 )
+
+type AreaList struct {
+	AreaCodes []AreaCode `xml:"areaCode"`
+}
+
+type AreaCode struct {
+	Code     string `xml:"code"`
+	CityName string `xml:"cityName"`
+}
 
 func main() {
 	flag.Parse()
@@ -28,22 +36,73 @@ func main() {
 
 	//secondary()
 
-	restTest()
+	//restTest()
+	fileTestGB()
 	fmt.Println("")
 }
 
-func restTest() {
+func fileTestGB() {
+	xmlFile, err := os.Open("areacodes-44.xml")
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return
+	}
+	defer xmlFile.Close()
+
+	var q AreaList
+	decoder := xml.NewDecoder(xmlFile)
+
+	err = decoder.Decode(&q)
+
+	fmt.Println(len(q.AreaCodes))
+
+	fmt.Printf("Running UK for less than 10... Total Areas = %d\n", len(q.AreaCodes))
+	for i, areaCode := range q.AreaCodes {
+
+		avail := restTest("GB", fmt.Sprintf("+44%s", areaCode.Code[1:]))
+		fmt.Printf("Line %d \t %s \t %s \t avail = %d \n", i, areaCode.Code, areaCode.CityName, len(avail))
+	}
+	fmt.Println("Done.")
+}
+
+func fileTestUS() {
+	xmlFile, err := os.Open("areacodes-1.xml")
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return
+	}
+	defer xmlFile.Close()
+
+	var q AreaList
+	decoder := xml.NewDecoder(xmlFile)
+
+	err = decoder.Decode(&q)
+
+	fmt.Println(len(q.AreaCodes))
+
+	fmt.Printf("Running US for less than 10... Total Areas = %d\n", len(q.AreaCodes))
+	for i, areaCode := range q.AreaCodes {
+
+		avail := restTest("US", fmt.Sprintf("+1%s", areaCode.Code))
+
+		if len(avail) < 10 {
+			fmt.Printf("Line %d \t %s \t %s \t avail = %d \n", i, areaCode.Code, areaCode.CityName, len(avail))
+		}
+	}
+	fmt.Println("Done.")
+}
+
+func restTest(country, code string) []rest.AvailableNumber {
 
 	apibase := "https://api.twilio.com"
 	apiversion := "2010-04-01"
 
-	availuri := fmt.Sprintf("Accounts/%s/AvailablePhoneNumbers/%s/Local.json", url.QueryEscape(*accountsid), url.QueryEscape(*country))
+	availuri := fmt.Sprintf("Accounts/%s/AvailablePhoneNumbers/%s/Local.json", url.QueryEscape(*accountsid), url.QueryEscape(country))
 
 	u, err := url.Parse(fmt.Sprintf("%s/%s/%s", apibase, apiversion, availuri))
 	q := u.Query()
-	q.Set("Contains", "+441702")
+	q.Set("Contains", code)
 	u.RawQuery = q.Encode()
-	fmt.Println(u)
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		log.Fatalf("error building request: %s", err)
@@ -62,7 +121,7 @@ func restTest() {
 	numResponse := new(rest.AvailableNumbersResponse)
 	err = decoder.Decode(numResponse)
 
-	fmt.Println(numResponse)
+	return numResponse.AvailableNumbers
 
 	//-d "AreaCode=510" \
 	//-u 'AC1ab10b47c2bb2d804d3dcee408ddf8ce:{AuthToken}'
